@@ -330,7 +330,256 @@ function screenQuests(){
     </div>
   `;
 }
+// -------------------- SPORT --------------------
+if(!state.sport){
+  state.sport = {
+    logsByDay:{},
+    autoFillMax:true
+  };
+  save();
+}
 
+const WORKOUTS = {
+  A: {
+    name: "Séance A",
+    xp: 250,
+    restSec: 75,
+    exercises: [
+      { id:"latpulldown", name:"Tirage vertical (poulie haute)", sets:3, type:"reps", target:10 },
+      { id:"chestpress", name:"Chest press", sets:3, type:"reps", target:10 },
+      { id:"goblet", name:"Goblet squat", sets:3, type:"reps", target:12 },
+      { id:"lowrow", name:"Rowing poulie basse", sets:3, type:"reps", target:10 },
+      { id:"plank", name:"Gainage", sets:2, type:"sec", target:45 },
+    ]
+  },
+  B: {
+    name: "Séance B",
+    xp: 250,
+    restSec: 75,
+    exercises: [
+      { id:"pullups", name:"Tractions (ou négatives)", sets:3, type:"reps", target:5 },
+      { id:"pecdeck", name:"Pec deck", sets:3, type:"reps", target:12 },
+      { id:"legcurl", name:"Leg curl", sets:3, type:"reps", target:12 },
+      { id:"pushups", name:"Pompes sur poignées", sets:3, type:"reps", target:10 },
+      { id:"kneeraises", name:"Relevés de genoux", sets:2, type:"reps", target:10 },
+    ]
+  },
+  MINI: {
+    name: "Séance MINI (12 min)",
+    xp: 150,
+    restSec: 20,
+    exercises: [
+      { id:"mini1", name:"Circuit 1 — Squats + Pompes", sets:2, type:"sec", target:360 },
+      { id:"mini2", name:"Circuit 2 — Rowing + Gainage", sets:2, type:"sec", target:360 },
+    ]
+  }
+};
+
+let session = null; // session active
+
+function makeSession(code){
+  const w = WORKOUTS[code];
+  const flat = [];
+  w.exercises.forEach(ex=>{
+    for(let i=1;i<=ex.sets;i++){
+      flat.push({ exId:ex.id, exName:ex.name, setIndex:i, type:ex.type, target:ex.target, value:null });
+    }
+  });
+  return {
+    code,
+    startedAt: Date.now(),
+    phase: "work", // work | rest | done
+    restLeftMs: 0,
+    i: 0,
+    flat,
+    totalSets: flat.length,
+    timer: null
+  };
+}
+
+function currentSet(){
+  if(!session) return null;
+  return session.flat[session.i] || null;
+}
+
+function startRest(){
+  const w=WORKOUTS[session.code];
+  session.phase="rest";
+  session.restLeftMs = (w.restSec||60)*1000;
+  vibrate(250); beep();
+}
+
+function finishSet(){
+  const s=currentSet();
+  if(!s) return;
+  // auto fill max
+  if((s.value===null || s.value==="") && state.sport.autoFillMax){
+    s.value = s.target;
+  }
+  session.i++;
+  if(session.i>=session.flat.length){
+    session.phase="done";
+    return;
+  }
+  startRest();
+}
+
+function tick(){
+  if(!session) return;
+  if(session.phase==="rest"){
+    session.restLeftMs -= 250;
+    if(session.restLeftMs<=0){
+      session.phase="work";
+      session.restLeftMs=0;
+      vibrate(120); beep();
+    }
+  }
+  render();
+}
+
+function stopTimer(){
+  if(session && session.timer){
+    clearInterval(session.timer);
+    session.timer=null;
+  }
+}
+
+function startTimer(){
+  stopTimer();
+  session.timer = setInterval(tick, 250);
+}
+
+function saveWorkoutLog(){
+  const day=todayKey();
+  const w=WORKOUTS[session.code];
+  const durationMs = Date.now()-session.startedAt;
+
+  const setsDone = session.flat.filter(x=>x.value!==null && x.value!=="" ).length;
+  const log = {
+    code: session.code,
+    name: w.name,
+    date: day,
+    startedAt: session.startedAt,
+    durationMs,
+    totalSets: session.totalSets,
+    setsDone,
+    flat: session.flat,
+    xp: w.xp
+  };
+
+  state.sport.logsByDay[day] = state.sport.logsByDay[day] || [];
+  state.sport.logsByDay[day].push(log);
+  save();
+
+  // quest "sport" auto-check
+  state.quests.doneByDay[day]=state.quests.doneByDay[day]||{};
+  if(!state.quests.doneByDay[day]["sport"]){
+    state.quests.doneByDay[day]["sport"]=true;
+    addXp(w.xp);
+  }else{
+    addXp(w.xp); // on donne l'XP quand même
+  }
+  save();
+}
+
+function screenSport(){
+  const day=todayKey();
+  const logs = state.sport.logsByDay[day] || [];
+  const logsHtml = logs.length ? logs.slice().reverse().map(l=>`
+    <div class="box">
+      <div class="row between">
+        <div style="font-weight:900">${l.name}</div>
+        <small class="mono">${msToClock(l.durationMs)}</small>
+      </div>
+      <small class="hint">Sets: ${l.setsDone}/${l.totalSets} · XP +${l.xp}</small>
+    </div>
+  `).join('') : `<small class="hint">Aucun log aujourd’hui.</small>`;
+
+  if(session){
+    const set = currentSet();
+    const w=WORKOUTS[session.code];
+    const pct = Math.round((session.i/session.totalSets)*100);
+
+    const title = session.phase==="done" ? "Mission terminée" : (session.phase==="rest" ? "Repos" : "Série");
+    const right = `<div class="pill">${pct}%</div>`;
+
+    let body = "";
+    if(session.phase==="done"){
+      body = `
+        <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">XP</div><div style="font-weight:900">+${w.xp}</div></div>
+        <div class="hr"></div>
+        <button class="btn primary" id="saveWorkout">Sauvegarder le log</button>
+        <button class="btn ghost" id="cancelWorkout" style="margin-left:8px">Annuler</button>
+      `;
+    }else if(session.phase==="rest"){
+      body = `
+        <div class="kpi">
+          <div class="value mono">${msToClock(session.restLeftMs)}</div>
+          <div class="label">Repos</div>
+        </div>
+        <div class="hr"></div>
+        <button class="btn" id="skipRest">Passer le repos</button>
+      `;
+    }else{
+      const placeholder = set.type==="reps" ? "reps" : "secondes";
+      body = `
+        <div class="mono" style="font-weight:900;letter-spacing:.08em;color:var(--hud2)">${w.name}</div>
+        <div style="margin-top:10px;font-weight:900">${set.exName}</div>
+        <small class="hint">Série ${set.setIndex} / ${w.exercises.find(e=>e.id===set.exId)?.sets || "?"} · cible ${set.target} ${placeholder}</small>
+        <label>Valeur (optionnel)</label>
+        <input inputmode="numeric" id="setValue" placeholder="${set.target}">
+        <div class="row" style="margin-top:10px;gap:10px">
+          <button class="btn primary" id="finishSet">Terminer la série</button>
+          <button class="btn ghost" id="endWorkout">Stop</button>
+        </div>
+        <small class="hint">Si tu ne remplis pas, l’app met automatiquement la valeur MAX cible.</small>
+      `;
+    }
+
+    return `
+      <div class="grid">
+        ${card("Sport — session active", right, body)}
+        ${card("Logs du jour", "", `<div class="grid">${logsHtml}</div>`)}
+      </div>
+    `;
+  }
+
+  const pick = `
+    <div class="grid">
+      ${Object.keys(WORKOUTS).map(code=>{
+        const w=WORKOUTS[code];
+        return `
+          <div class="box">
+            <div class="row between">
+              <div style="font-weight:900">${w.name}</div>
+              <small class="mono">+${w.xp} XP</small>
+            </div>
+            <small class="hint">${w.exercises.length} exercices · repos ${w.restSec}s</small>
+            <div class="row" style="margin-top:10px;gap:10px;flex-wrap:wrap">
+              <button class="btn primary" data-start="${code}">Démarrer</button>
+            </div>
+          </div>
+        `;
+      }).join('')}
+      <div class="box">
+        <div class="row between">
+          <div style="font-weight:900">Option</div>
+          <small class="mono">AUTO</small>
+        </div>
+        <label><input type="checkbox" id="autoFill" ${state.sport.autoFillMax?'checked':''} style="width:18px;height:18px"> Auto-remplir MAX</label>
+        <small class="hint">Si tu oublies de saisir, l’app met la cible automatiquement.</small>
+      </div>
+    </div>
+  `;
+
+  return `
+    <div class="grid">
+      ${card("Sport — Séances", "", pick)}
+      ${card("Logs du jour", "", `<div class="grid">${logsHtml}</div>`)}
+    </div>
+  `;
+      }
+  
 function screenPlus(){
   const fin = state.finance.bars.map(b=>`
     <div class="box">
@@ -428,12 +677,73 @@ function bind(){
       render();
     }
   });
+  // --- SPORT binds ---
+  document.querySelectorAll('[data-start]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const code=btn.dataset.start;
+      session = makeSession(code);
+      startTimer();
+      render();
+    });
+  });
+
+  const auto=$("#autoFill");
+  if(auto) auto.addEventListener('change', ()=>{
+    state.sport.autoFillMax = !!auto.checked;
+    save();
+  });
+
+  const finish=$("#finishSet");
+  if(finish) finish.addEventListener('click', ()=>{
+    const set=currentSet();
+    const v = $("#setValue") ? $("#setValue").value : "";
+    if(set){
+      set.value = (v===""? null : Number(v));
+    }
+    finishSet();
+    save();
+    render();
+  });
+
+  const skip=$("#skipRest");
+  if(skip) skip.addEventListener('click', ()=>{
+    session.phase="work";
+    session.restLeftMs=0;
+    vibrate(120); beep();
+    render();
+  });
+
+  const end=$("#endWorkout");
+  if(end) end.addEventListener('click', ()=>{
+    if(confirm("Stopper la séance ?")){
+      stopTimer();
+      session=null;
+      render();
+    }
+  });
+
+  const saveW=$("#saveWorkout");
+  if(saveW) saveW.addEventListener('click', ()=>{
+    saveWorkoutLog();
+    stopTimer();
+    session=null;
+    render();
+    alert("Workout log sauvegardé + XP ajouté.");
+  });
+
+  const cancelW=$("#cancelWorkout");
+  if(cancelW) cancelW.addEventListener('click', ()=>{
+    stopTimer();
+    session=null;
+    render();
+  });
 }
 
 function render(){
   const app=$("#app");
   if(tab==='hud') app.innerHTML = screenHud();
   if(tab==='q') app.innerHTML = screenQuests();
+  if(tab==='s') app.innerHTML = screenSport();
   if(tab==='p') app.innerHTML = screenPlus();
   bind();
 }
