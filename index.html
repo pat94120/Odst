@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="fr">
 <head>
@@ -9,7 +8,7 @@
   <style>
     :root{
       --bg:#070b0d; --panel:#0b1215; --hud:#35f0d0; --hud2:#33b3ff;
-      --text:#d6f7f0; --muted:#7ab9ad; --danger:#ff5e7a; --warn:#ffd36e;
+      --text:#d6f7f0; --muted:#7ab9ad; --danger:#ff5e7a; --warn:#ffd36e; --ok:#79ff9c;
       --shadow: 0 10px 30px rgba(0,0,0,.45);
       --r: 22px;
     }
@@ -51,6 +50,7 @@
     .grid{display:grid;gap:12px}
     .row{display:flex;gap:10px;align-items:center}
     .between{justify-content:space-between}
+    .wrap{flex-wrap:wrap}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
     .btn{
       border:1px solid rgba(53,240,208,.25); background:rgba(53,240,208,.07); color:var(--text);
@@ -80,7 +80,7 @@
       border-top:1px solid rgba(53,240,208,.12);
       backdrop-filter:blur(10px);
     }
-    .tabbar-inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+    .tabbar-inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
     .tab{
       border-radius:16px;padding:10px 8px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);
       text-align:center;font-size:11px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;user-select:none;
@@ -95,6 +95,20 @@
     .box{
       padding:12px;border-radius:18px;border:1px solid rgba(53,240,208,.14);background:rgba(255,255,255,.03)
     }
+    .tiny{font-size:12px;color:var(--muted)}
+    .tag{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);font-size:12px}
+    .ok{color:var(--ok)}
+    .warn{color:var(--warn)}
+    .danger{color:var(--danger)}
+    .modal{
+      position:fixed;inset:0;z-index:50;display:none;
+      background:rgba(0,0,0,.55);backdrop-filter:blur(6px);
+      padding:18px;
+    }
+    .modal.open{display:block}
+    .modal-card{max-width:560px;margin:0 auto;border-radius:28px;border:1px solid rgba(53,240,208,.16);background:linear-gradient(180deg, rgba(11,18,21,.96), rgba(8,16,20,.92));box-shadow:var(--shadow);padding:14px}
+    .modal-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+    .svgbox{border:1px solid rgba(53,240,208,.14);background:rgba(0,0,0,.20);border-radius:18px;padding:10px}
   </style>
 </head>
 <body>
@@ -102,7 +116,7 @@
     <div class="topbar-inner">
       <div>
         <h1>ODST LIFE RPG</h1>
-        <small>HUD · Offline · 1 fichier</small>
+        <small>HUD · Sport · Langues · Rapports · Bibliothèque</small>
       </div>
       <div class="pill" id="topPill">STATION HUD</div>
     </div>
@@ -115,14 +129,30 @@
     <div class="tabbar-inner" id="tabs"></div>
   </div>
 
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <div class="mono" id="modalTitle" style="font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--hud)">FICHE</div>
+          <small id="modalSub">—</small>
+        </div>
+        <button class="btn ghost" id="modalClose">Fermer</button>
+      </div>
+      <div class="hr"></div>
+      <div id="modalBody" class="grid"></div>
+    </div>
+  </div>
+
 <script>
-const KEY = "odstLifeRpg.single.v1";
+const KEY = "odstLifeRpg.FINAL.v3";
 const $ = sel => document.querySelector(sel);
+const norm = s => (s||"").trim().toLowerCase();
 
 function todayKey(d=new Date()){
   const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
 }
+function parseDayKey(k){ return new Date(k+"T00:00:00"); }
 function msToClock(ms){
   const s=Math.max(0, Math.floor(ms/1000));
   const mm=String(Math.floor(s/60)).padStart(2,'0');
@@ -145,6 +175,205 @@ function beep(){
 }
 function vibrate(ms=200){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch{} }
 
+function deepMerge(a,b){
+  if(Array.isArray(a)) return (b ?? a);
+  if(a && typeof a === 'object'){
+    const out={...a};
+    for(const k of Object.keys(b||{})) out[k]=deepMerge(a[k], b[k]);
+    return out;
+  }
+  return (b ?? a);
+}
+
+function hudSvg(label){
+  return `
+  <div class="svgbox">
+    <svg viewBox="0 0 320 110" width="100%" height="110" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="rgba(53,240,208,.95)"/>
+          <stop offset="1" stop-color="rgba(51,179,255,.75)"/>
+        </linearGradient>
+      </defs>
+      <rect x="10" y="12" width="300" height="86" rx="18" fill="rgba(0,0,0,.25)" stroke="rgba(53,240,208,.25)"/>
+      <path d="M25 70 L90 35 L155 70 L220 35 L295 70" fill="none" stroke="url(#g)" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="90" cy="35" r="6" fill="rgba(53,240,208,.95)"/>
+      <circle cx="220" cy="35" r="6" fill="rgba(51,179,255,.85)"/>
+      <text x="20" y="30" fill="rgba(214,247,240,.95)" font-size="12" font-family="ui-monospace, Menlo, Consolas">${label}</text>
+      <text x="20" y="92" fill="rgba(122,185,173,.95)" font-size="11" font-family="ui-monospace, Menlo, Consolas">ODST // LIBRARY VISUAL</text>
+    </svg>
+  </div>`;
+}
+
+/* ==== PARTIE 1 STOP ICI ==== */
+  /* ========= Bibliothèque d’exercices ========= */
+const EXLIB = [
+  {
+    id:"latpulldown",
+    name:"Tirage vertical (poulie haute)",
+    muscles:["Dos","Grand dorsal","Biceps"],
+    equip:["Poulie haute"],
+    tips:[
+      "Tire les coudes vers les poches.",
+      "Poitrine fière, épaules basses.",
+      "Contrôle la remontée (2 sec)."
+    ],
+    steps:[
+      "Assieds-toi, cuisses bloquées, prise un peu plus large que les épaules.",
+      "Descends la barre vers le haut du torse en gardant le buste stable.",
+      "Marque une micro-pause, remonte lentement sans lâcher la tension."
+    ],
+    breath:"Inspire en remontant, expire en tirant.",
+    mistakes:["Tirer avec les avant-bras","Se balancer","Épaules qui montent"],
+    regressions:["Prise neutre","Charge plus légère","Amplitude réduite propre"],
+    progressions:["Tempo 3-1-1","Pause 1 sec en bas","Dropset léger"]
+  },
+  {
+    id:"chestpress",
+    name:"Chest press",
+    muscles:["Pecs","Triceps","Épaules"],
+    equip:["Machine chest press"],
+    tips:["Omoplates serrées (légèrement)","Poignets alignés","Poussée contrôlée"],
+    steps:[
+      "Réglage siège: poignées au niveau du milieu des pectoraux.",
+      "Pousse sans verrouiller brutalement les coudes.",
+      "Reviens jusqu'à sentir l'étirement sans perdre le contrôle."
+    ],
+    breath:"Expire en poussant, inspire en revenant.",
+    mistakes:["Décoller le dos","Verrouiller sec","Épaules en avant"],
+    regressions:["Moins lourd","Amplitude contrôlée"],
+    progressions:["Pause en bas","Tempo lent"]
+  },
+  {
+    id:"goblet",
+    name:"Goblet squat",
+    muscles:["Quadriceps","Fessiers","Gainage"],
+    equip:["Haltère/Kettlebell"],
+    tips:["Genoux suivent les pointes","Dos neutre","Pieds stables"],
+    steps:[
+      "Tiens l’haltère contre le torse, coudes vers le bas.",
+      "Descends entre les hanches, garde les talons au sol.",
+      "Remonte en poussant le sol, serre les fessiers."
+    ],
+    breath:"Inspire en descendant, expire en remontant.",
+    mistakes:["Talons qui décollent","Genoux rentrent","Dos arrondi"],
+    regressions:["Squat à la chaise","Amplitude réduite"],
+    progressions:["Pause en bas","Plus lourd","Tempo 3 sec descente"]
+  },
+  {
+    id:"lowrow",
+    name:"Rowing poulie basse",
+    muscles:["Dos","Rhomboïdes","Biceps"],
+    equip:["Poulie basse"],
+    tips:["Épaules basses","Tire le coude en arrière","Pas de balancier"],
+    steps:[
+      "Dos droit, poitrine ouverte, jambes légèrement fléchies.",
+      "Tire la poignée vers le nombril/haut ventre.",
+      "Reviens lentement bras tendus sans arrondir le dos."
+    ],
+    breath:"Expire en tirant, inspire en revenant.",
+    mistakes:["Se tirer vers l’arrière","Épaules hautes","Cou cassé"],
+    regressions:["Charge légère","Amplitude contrôlée"],
+    progressions:["Pause 1 sec en fin de tirage","Tempo lent"]
+  },
+  {
+    id:"plank",
+    name:"Gainage (planche)",
+    muscles:["Abdos","Transverse","Épaules"],
+    equip:["Sol"],
+    tips:["Rétroversion légère du bassin","Fesses serrées","Nuque neutre"],
+    steps:[
+      "Coudes sous les épaules, avant-bras au sol.",
+      "Corps en ligne droite, ne cambre pas.",
+      "Tiens la position en respirant calmement."
+    ],
+    breath:"Respiration lente (pas d’apnée).",
+    mistakes:["Hanches qui tombent","Fesses trop hautes","Apnée"],
+    regressions:["Planche genoux","Durée réduite"],
+    progressions:["Planche RKC","Ajout de temps"]
+  },
+  {
+    id:"pullups",
+    name:"Tractions (ou négatives)",
+    muscles:["Dos","Biceps"],
+    equip:["Barre de traction"],
+    tips:["Déprime les épaules","Monte poitrine vers la barre","Contrôle la descente"],
+    steps:[
+      "Prise pronation ou neutre, gainage.",
+      "Monte en tirant les coudes vers le bas.",
+      "Descends lentement (2–4 sec)."
+    ],
+    breath:"Expire en montant, inspire en descendant.",
+    mistakes:["Balancer","Cou en avant","Descendre trop vite"],
+    regressions:["Négatives","Élastique","Row inversé"],
+    progressions:["Pause en haut","Tempo lent","Poids"]
+  },
+  {
+    id:"pecdeck",
+    name:"Pec deck",
+    muscles:["Pecs"],
+    equip:["Machine pec deck"],
+    tips:["Poitrine ouverte","Amène les coudes ensemble","Contrôle"],
+    steps:[
+      "Réglage: avant-bras/coudes confortables, dos collé.",
+      "Ramène les bras jusqu’à sentir les pecs travailler.",
+      "Reviens lentement."
+    ],
+    breath:"Expire en serrant, inspire en revenant.",
+    mistakes:["Épaules en avant","Trop lourd","Amplitude tronquée"],
+    regressions:["Charge légère","Amplitude propre"],
+    progressions:["Pause 1 sec en contraction","Tempo"]
+  },
+  {
+    id:"legcurl",
+    name:"Leg curl",
+    muscles:["Ischios"],
+    equip:["Machine leg curl"],
+    tips:["Hanches collées au siège","Contrôle","Pas d’élan"],
+    steps:[
+      "Réglage: rouleau au-dessus des chevilles.",
+      "Fléchis les genoux, serre les ischios.",
+      "Reviens lentement."
+    ],
+    breath:"Expire en flexion, inspire en retour.",
+    mistakes:["Décoller les hanches","Trop lourd","Rebond"],
+    regressions:["Moins lourd","Amplitude contrôlée"],
+    progressions:["Pause en bas","Tempo lent"]
+  },
+  {
+    id:"pushups",
+    name:"Pompes sur poignées",
+    muscles:["Pecs","Triceps","Gainage"],
+    equip:["Poignées"],
+    tips:["Corps gainé","Coudes à ~45°","Contrôle"],
+    steps:[
+      "Poignées sous les épaules, corps gainé.",
+      "Descends jusqu’à poitrine proche du sol.",
+      "Remonte sans cambrer."
+    ],
+    breath:"Inspire en descendant, expire en remontant.",
+    mistakes:["Hanches qui tombent","Coudes trop ouverts","Cou cassé"],
+    regressions:["Pompes genoux","Incliné (mains sur support)"],
+    progressions:["Tempo lent","Pieds surélevés"]
+  },
+  {
+    id:"kneeraises",
+    name:"Relevés de genoux",
+    muscles:["Abdos","Fléchisseurs hanche"],
+    equip:["Barre/chaise romaine ou sol"],
+    tips:["Rentre le nombril","Contrôle","Pas d’élan"],
+    steps:[
+      "Gainage, remonte les genoux vers le torse.",
+      "Marque une pause, redescends contrôlé."
+    ],
+    breath:"Expire en montant, inspire en descendant.",
+    mistakes:["Balancier","Descente lâchée","Dos cambré"],
+    regressions:["Relevés assis","Amplitude réduite"],
+    progressions:["Jambes tendues","Tempo lent"]
+  },
+];
+
+/* ========= Defaults ========= */
 const DEFAULTS = {
   meta:{ streak:0, lastXpDay:null },
   xp:{ total:0, byDay:{} },
@@ -158,32 +387,42 @@ const DEFAULTS = {
   },
   quests:{
     items:[
-      {id:'sport', cat:'Sport', name:'Séance (A/B/MINI)', xp:250},
-      {id:'walk', cat:'Sport', name:'10 min marche', xp:60},
-      {id:'quiz', cat:'Langues', name:'Micro-quiz', xp:80},
-      {id:'write', cat:'Langues', name:'Phrase écrite', xp:80},
-      {id:'fin', cat:'Finances', name:'Point finances (2 min)', xp:40},
-      {id:'family', cat:'Famille', name:'Moment 1:1 (10 min)', xp:70},
-      {id:'breath', cat:'Mental', name:'Respiration (2 min)', xp:40},
+      {id:'sport', cat:'Sport', name:'Séance (A/B/MINI)', xp:250, freq:'daily'},
+      {id:'walk', cat:'Sport', name:'10 min marche', xp:60, freq:'daily'},
+      {id:'quiz', cat:'Langues', name:'Micro-quiz', xp:80, freq:'daily'},
+      {id:'write', cat:'Langues', name:'Phrase écrite', xp:80, freq:'daily'},
+      {id:'fin', cat:'Finances', name:'Point finances (2 min)', xp:40, freq:'daily'},
+      {id:'family', cat:'Famille', name:'Moment 1:1 (10 min)', xp:70, freq:'daily'},
+      {id:'breath', cat:'Mental', name:'Respiration (2 min)', xp:40, freq:'daily'},
+      {id:'review', cat:'Mental', name:'Revue hebdo (5 min)', xp:180, freq:'weekly'},
     ],
-    doneByDay:{}
-  }
+    doneByDay:{},
+  },
+  sport:{
+    logsByDay:{},
+    autoFillMax:true
+  },
+  lang:{
+    deck:[
+      {q:'Bonjour',a:'Hola'},
+      {q:'Merci',a:'Gracias'},
+      {q:"S'il te plaît",a:'Por favor'},
+      {q:'Comment ça va ?',a:'¿Cómo estás?'},
+      {q:'Je ne comprends pas',a:'No entiendo'},
+      {q:'Combien ça coûte ?',a:'¿Cuánto cuesta?'},
+      {q:'À demain',a:'Hasta mañana'},
+    ],
+    pointer:0,
+    logsByDay:{}
+  },
+  badges:{ unlocked:{} },
 };
-
-function deepMerge(a,b){
-  if(Array.isArray(a)) return (b ?? a);
-  if(a && typeof a === 'object'){
-    const out={...a};
-    for(const k of Object.keys(b||{})) out[k]=deepMerge(a[k], b[k]);
-    return out;
-  }
-  return (b ?? a);
-}
 
 let state = load();
 state = state ? deepMerge(DEFAULTS, state) : JSON.parse(JSON.stringify(DEFAULTS));
 save();
 
+/* ========= XP / streak ========= */
 function addXp(amount){
   const day=todayKey();
   state.xp.byDay[day]=(state.xp.byDay[day]||0)+amount;
@@ -199,15 +438,18 @@ function addXp(amount){
     state.meta.lastXpDay=day;
   }
   save();
+  checkBadges();
 }
 
+/* ========= Tabs ========= */
 const TABS = [
   {id:'hud', label:'HUD'},
   {id:'q', label:'Quêtes'},
   {id:'s', label:'Sport'},
+  {id:'l', label:'Langues'},
+  {id:'r', label:'Rapports'},
   {id:'p', label:'Plus'},
 ];
-
 let tab = 'hud';
 
 function renderTabs(){
@@ -240,7 +482,137 @@ function progress(value, max){
   return `<div class="progress"><div style="width:${pct}%"></div></div>`;
 }
 
+/* ========= Modal ========= */
+function openModal(title, sub, bodyHtml){
+  $("#modalTitle").textContent = title;
+  $("#modalSub").textContent = sub || "";
+  $("#modalBody").innerHTML = bodyHtml || "";
+  $("#modal").classList.add("open");
+}
+function closeModal(){ $("#modal").classList.remove("open"); }
+$("#modalClose").addEventListener("click", closeModal);
+$("#modal").addEventListener("click", (e)=>{ if(e.target.id==="modal") closeModal(); });
+
+/* ==== PARTIE 2 STOP ICI ==== */
+  /* ========= Badges ========= */
+const BADGE_DEFS = [
+  {id:"SAFE_ZONE", name:"SAFE ZONE", desc:"Épargne sécurité ≥ 2000€", check:()=> (getBar("safety")?.current||0) >= 2000},
+  {id:"MOTHER_CLEAR", name:"MOTHER CLEAR", desc:"Dette maman = 0€", check:()=> (getBar("mother")?.current||0) <= 0},
+  {id:"SISTERS_CLEAR", name:"SISTERS CLEAR", desc:"Dettes sœurs = 0€", check:()=> (getBar("sisters")?.current||0) <= 0},
+  {id:"ODST_DISCIPLINE", name:"ODST DISCIPLINE", desc:"≥ 900 XP sur une semaine", check:()=> weeklyXp(lastNDays(7)) >= 900},
+  {id:"FIRST_LOG", name:"FIRST LOG", desc:"1er entraînement loggé", check:()=> Object.keys(state.sport.logsByDay||{}).some(k=>(state.sport.logsByDay[k]||[]).length>0)},
+  {id:"LINGO_STREAK_7", name:"LINGO STREAK", desc:"Langues validées 7 jours (dans les 10 derniers jours)", check:()=> countLangDays(lastNDays(10))>=7},
+];
+
+function unlockBadge(id){
+  state.badges.unlocked[id] = state.badges.unlocked[id] || {at: new Date().toISOString()};
+  save();
+}
+function checkBadges(){
+  for(const b of BADGE_DEFS){
+    if(state.badges.unlocked[b.id]) continue;
+    try{
+      if(b.check()){
+        unlockBadge(b.id);
+      }
+    }catch{}
+  }
+}
+function getBar(id){ return (state.finance.bars||[]).find(b=>b.id===id); }
+
+/* ========= Date utils / Reports ========= */
+function startOfWeek(d){
+  const x=new Date(d);
+  const day=(x.getDay()+6)%7; // Monday=0
+  x.setDate(x.getDate()-day);
+  x.setHours(0,0,0,0);
+  return x;
+}
+function fmtDay(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function lastNDays(n){
+  const out=[];
+  const t=new Date(); t.setHours(0,0,0,0);
+  for(let i=0;i<n;i++){
+    const d=new Date(t); d.setDate(d.getDate()-i);
+    out.push(fmtDay(d));
+  }
+  return out;
+}
+function keysInRange(startKey, endKey){
+  const out=[];
+  const start=new Date(startKey+"T00:00:00"), end=new Date(endKey+"T00:00:00");
+  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+    out.push(fmtDay(d));
+  }
+  return out;
+}
+
+function weeklyXp(dayKeys){
+  return dayKeys.reduce((sum,k)=>sum+(state.xp.byDay[k]||0),0);
+}
+function countQuestDone(dayKeys){
+  let done=0, total=0;
+  for(const k of dayKeys){
+    const map=state.quests.doneByDay[k]||{};
+    for(const q of state.quests.items){
+      if(q.freq==="weekly") continue;
+      total += 1;
+      if(map[q.id]) done += 1;
+    }
+  }
+  return {done,total, pct: total? Math.round(done/total*100):0};
+}
+function countWeeklyQuestDone(weekStartKey){
+  const start=new Date(weekStartKey+"T00:00:00");
+  const end=new Date(start); end.setDate(end.getDate()+6);
+  const keys=keysInRange(fmtDay(start), fmtDay(end));
+  const qids=state.quests.items.filter(q=>q.freq==="weekly").map(q=>q.id);
+  const mapCombined={};
+  for(const k of keys){
+    const m=state.quests.doneByDay[k]||{};
+    for(const id of qids) if(m[id]) mapCombined[id]=true;
+  }
+  const done = Object.keys(mapCombined).length;
+  const total = qids.length;
+  return {done,total, pct: total? Math.round(done/total*100):0};
+}
+function countLangDays(dayKeys){
+  let ok=0;
+  for(const k of dayKeys){
+    const l=state.lang.logsByDay[k];
+    if(l && l.quizDone && l.writingDone) ok++;
+  }
+  return ok;
+}
+function sportTotals(dayKeys){
+  let sessions=0, durationMs=0, setsDone=0;
+  const perEx={};
+  for(const k of dayKeys){
+    const logs=state.sport.logsByDay[k]||[];
+    for(const l of logs){
+      sessions++;
+      durationMs += (l.durationMs||0);
+      setsDone += (l.setsDone||0);
+      for(const s of (l.flat||[])){
+        const exId=s.exId;
+        perEx[exId]=perEx[exId]||{name:s.exName, reps:0, sec:0, sets:0, pr:0};
+        perEx[exId].sets += 1;
+        if(typeof s.value === "number"){
+          if(s.type==="reps"){ perEx[exId].reps += s.value; perEx[exId].pr = Math.max(perEx[exId].pr, s.value); }
+          if(s.type==="sec"){ perEx[exId].sec += s.value; perEx[exId].pr = Math.max(perEx[exId].pr, s.value); }
+        }
+      }
+    }
+  }
+  return {sessions, durationMs, setsDone, perEx};
+}
+
+/* ========= HUD ========= */
 function screenHud(){
+  checkBadges();
   const day=todayKey();
   const xpToday=state.xp.byDay[day]||0;
   const level=Math.floor(xpToday/500)+1;
@@ -258,6 +630,12 @@ function screenHud(){
     `;
   }).join('');
 
+  const unlocked = Object.keys(state.badges.unlocked||{});
+  const badges = unlocked.length ? unlocked.map(id=>{
+    const def=BADGE_DEFS.find(b=>b.id===id);
+    return `<span class="tag"><span class="ok">●</span>${def?def.name:id}</span>`;
+  }).join('') : `<small class="hint">Aucun badge pour le moment. (Ils se débloquent automatiquement.)</small>`;
+
   return `
     <div class="grid">
       ${card("Statut du jour", `<div class="pill">STREAK ${state.meta.streak||0}</div>`, `
@@ -268,36 +646,42 @@ function screenHud(){
           </div>
           <div class="kpi" style="flex:1">
             <div class="value">Lv ${level}</div>
-            <div class="label">Niveau du jour</div>
+            <div class="label">Niveau (500)</div>
           </div>
         </div>
         <div style="margin-top:12px">
-          <div class="row between"><small>Progression (500 XP)</small><small class="mono">${into}/500</small></div>
+          <div class="row between"><small>Progression</small><small class="mono">${into}/500</small></div>
           <div style="margin-top:8px">${progress(into, 500)}</div>
         </div>
         <div class="hr"></div>
-        <div class="row between">
+        <div class="row between wrap">
           <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">RANG</div><div style="font-weight:900">${rank}</div></div>
           <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">TOTAL</div><div style="font-weight:900">${state.xp.total||0} XP</div></div>
         </div>
       `)}
       ${card("Finances — aperçu", "", `<div class="grid">${fin}<small class="hint">Modifie les valeurs dans “Plus → Finances”.</small></div>`)}
+      ${card("Badges débloqués", "", `<div class="row wrap" style="gap:8px">${badges}</div>`)}
     </div>
   `;
 }
 
+/* ========= Quêtes ========= */
 function screenQuests(){
   const day=todayKey();
   const done=state.quests.doneByDay[day]||{};
   const items=state.quests.items;
-  const total=items.length;
-  const completed=Object.keys(done).length;
+
+  const daily = items.filter(q=>q.freq!=="weekly");
+  const weekly = items.filter(q=>q.freq==="weekly");
+
+  const total=daily.length;
+  const completed=Object.keys(done).filter(id=>daily.some(q=>q.id===id)).length;
   const pct= total? Math.round(completed/total*100):0;
 
-  const cats=[...new Set(items.map(q=>q.cat))];
+  const cats=[...new Set(daily.map(q=>q.cat))];
 
   const blocks=cats.map(cat=>{
-    const qs=items.filter(q=>q.cat===cat);
+    const qs=daily.filter(q=>q.cat===cat);
     const inner=qs.map(q=>{
       const checked=!!done[q.id];
       return `
@@ -318,27 +702,123 @@ function screenQuests(){
     `;
   }).join('');
 
+  const weekStart = fmtDay(startOfWeek(new Date()));
+  const weeklyStatus = countWeeklyQuestDone(weekStart);
+  const weeklyBlock = weekly.length ? `
+    <div class="box">
+      <div class="row between">
+        <div class="mono" style="font-weight:900;color:var(--hud2)">Quêtes hebdo</div>
+        <div class="pill">${weeklyStatus.done}/${weeklyStatus.total}</div>
+      </div>
+      <div class="hr"></div>
+      <div class="grid">
+        ${weekly.map(q=>{
+          const checked=!!done[q.id];
+          return `
+            <label style="display:flex;gap:10px;align-items:center;margin:0;cursor:pointer">
+              <input type="checkbox" data-q="${q.id}" ${checked?'checked':''} style="width:18px;height:18px"/>
+              <div style="flex:1">
+                <div style="font-weight:800">${q.name}</div>
+                <small class="mono">+${q.xp} XP</small>
+              </div>
+            </label>
+          `;
+        }).join('')}
+      </div>
+      <div class="hr"></div>
+      <small class="hint">Si tu coches une quête hebdo, elle compte pour toute la semaine.</small>
+    </div>
+  ` : '';
+
   return `
     <div class="grid">
-      ${card("Quêtes — checklist", `<div class="pill">${pct}%</div>`, `
+      ${card("Quêtes — daily", `<div class="pill">${pct}%</div>`, `
         <div class="row between"><small>Complétées aujourd’hui</small><small class="mono">${completed}/${total}</small></div>
         <div class="hr"></div>
         <div class="grid">${blocks}</div>
-        <div class="hr"></div>
-        <small class="hint">Cocher = gagne l’XP. Décoche = ne retire pas l’XP (simple & motivant).</small>
+      `)}
+      ${weeklyBlock? card("Hebdomadaire", "", weeklyBlock):""}
+      ${card("Raccourcis", "", `
+        <div class="row wrap" style="gap:10px">
+          <button class="btn" id="qAllDaily">Cocher toutes (daily)</button>
+          <button class="btn ghost" id="qClearToday">Tout décocher (aujourd’hui)</button>
+        </div>
+        <small class="hint">Décoche ne retire pas l’XP (volontaire).</small>
       `)}
     </div>
   `;
 }
-// -------------------- SPORT --------------------
-if(!state.sport){
-  state.sport = {
-    logsByDay:{},
-    autoFillMax:true
-  };
-  save();
+
+/* ==== PARTIE 3 STOP ICI ==== */
+  /* ========= Bibliothèque ========= */
+function libById(id){ return EXLIB.find(x=>x.id===id); }
+function libCard(ex){
+  const tags = [
+    ...ex.muscles.map(m=>`<span class="tag">${m}</span>`),
+    ...ex.equip.map(e=>`<span class="tag">${e}</span>`),
+  ].join('');
+  return `
+    <div class="box">
+      <div class="row between wrap">
+        <div style="font-weight:900">${ex.name}</div>
+        <button class="btn ghost small" data-openlib="${ex.id}">Voir fiche</button>
+      </div>
+      <div class="row wrap" style="gap:8px;margin-top:10px">${tags}</div>
+    </div>
+  `;
+}
+function openExerciseModal(exId){
+  const ex=libById(exId);
+  if(!ex) return;
+  const body = `
+    ${hudSvg(ex.name.toUpperCase())}
+    <div class="box">
+      <div class="mono" style="font-weight:900;color:var(--hud2)">Muscles</div>
+      <div class="row wrap" style="gap:8px;margin-top:10px">${ex.muscles.map(x=>`<span class="tag">${x}</span>`).join('')}</div>
+    </div>
+    <div class="box">
+      <div class="mono" style="font-weight:900;color:var(--hud2)">Équipement</div>
+      <div class="row wrap" style="gap:8px;margin-top:10px">${ex.equip.map(x=>`<span class="tag">${x}</span>`).join('')}</div>
+    </div>
+    <div class="box">
+      <div class="mono" style="font-weight:900;color:var(--hud2)">Étapes</div>
+      <ol class="hint" style="margin:10px 0 0; padding-left:18px">
+        ${ex.steps.map(s=>`<li>${s}</li>`).join('')}
+      </ol>
+    </div>
+    <div class="box">
+      <div class="mono" style="font-weight:900;color:var(--hud2)">Respiration</div>
+      <small class="hint">${ex.breath}</small>
+    </div>
+    <div class="box">
+      <div class="mono" style="font-weight:900;color:var(--hud2)">Focus / Tips</div>
+      <ul class="hint" style="margin:10px 0 0; padding-left:18px">
+        ${ex.tips.map(s=>`<li>${s}</li>`).join('')}
+      </ul>
+    </div>
+    <div class="box">
+      <div class="mono" style="font-weight:900;color:var(--hud2)">Erreurs fréquentes</div>
+      <ul class="hint" style="margin:10px 0 0; padding-left:18px">
+        ${ex.mistakes.map(s=>`<li>${s}</li>`).join('')}
+      </ul>
+    </div>
+    <div class="box">
+      <div class="mono" style="font-weight:900;color:var(--hud2)">Régressions</div>
+      <ul class="hint" style="margin:10px 0 0; padding-left:18px">
+        ${ex.regressions.map(s=>`<li>${s}</li>`).join('')}
+      </ul>
+    </div>
+    <div class="box">
+      <div class="mono" style="font-weight:900;color:var(--hud2)">Progressions</div>
+      <ul class="hint" style="margin:10px 0 0; padding-left:18px">
+        ${ex.progressions.map(s=>`<li>${s}</li>`).join('')}
+      </ul>
+    </div>
+  `;
+  openModal("EXERCICE", ex.name, body);
 }
 
+/* ========= Sport ========= */
 const WORKOUTS = {
   A: {
     name: "Séance A",
@@ -369,13 +849,14 @@ const WORKOUTS = {
     xp: 150,
     restSec: 20,
     exercises: [
-      { id:"mini1", name:"Circuit 1 — Squats + Pompes", sets:2, type:"sec", target:360 },
-      { id:"mini2", name:"Circuit 2 — Rowing + Gainage", sets:2, type:"sec", target:360 },
+      { id:"goblet", name:"Circuit — Squats (Goblet)", sets:2, type:"sec", target:360 },
+      { id:"pushups", name:"Circuit — Pompes", sets:2, type:"sec", target:360 },
     ]
   }
 };
 
-let session = null; // session active
+let session = null;
+let workoutClock = null;
 
 function makeSession(code){
   const w = WORKOUTS[code];
@@ -388,7 +869,7 @@ function makeSession(code){
   return {
     code,
     startedAt: Date.now(),
-    phase: "work", // work | rest | done
+    phase: "work",
     restLeftMs: 0,
     i: 0,
     flat,
@@ -396,10 +877,27 @@ function makeSession(code){
     timer: null
   };
 }
+function currentSet(){ return session ? (session.flat[session.i] || null) : null; }
 
-function currentSet(){
-  if(!session) return null;
-  return session.flat[session.i] || null;
+function stopWorkoutClock(){
+  if(workoutClock){ clearInterval(workoutClock); workoutClock=null; }
+}
+function startWorkoutClock(){
+  stopWorkoutClock();
+  workoutClock = setInterval(()=>{
+    const el = $("#workoutTimer");
+    if(el && session && session.startedAt){
+      el.textContent = msToClock(Date.now()-session.startedAt);
+    }
+  }, 1000);
+}
+
+function stopTimer(){
+  if(session && session.timer){ clearInterval(session.timer); session.timer=null; }
+}
+function startTimer(){
+  stopTimer();
+  session.timer = setInterval(tick, 1000);
 }
 
 function startRest(){
@@ -407,54 +905,41 @@ function startRest(){
   session.phase="rest";
   session.restLeftMs = (w.restSec||60)*1000;
   vibrate(250); beep();
+  render();
 }
-
 function finishSet(){
   const s=currentSet();
   if(!s) return;
-  // auto fill max
   if((s.value===null || s.value==="") && state.sport.autoFillMax){
     s.value = s.target;
   }
   session.i++;
   if(session.i>=session.flat.length){
     session.phase="done";
+    render();
     return;
   }
   startRest();
 }
-
+// clavier OK: re-render uniquement pendant repos
 function tick(){
   if(!session) return;
   if(session.phase==="rest"){
-    session.restLeftMs -= 250;
+    session.restLeftMs -= 1000;
     if(session.restLeftMs<=0){
       session.phase="work";
       session.restLeftMs=0;
       vibrate(120); beep();
     }
-  }
-  render();
-}
-
-function stopTimer(){
-  if(session && session.timer){
-    clearInterval(session.timer);
-    session.timer=null;
+    render();
   }
 }
-
-function startTimer(){
-  stopTimer();
-  session.timer = setInterval(tick, 250);
-}
-
 function saveWorkoutLog(){
   const day=todayKey();
   const w=WORKOUTS[session.code];
   const durationMs = Date.now()-session.startedAt;
 
-  const setsDone = session.flat.filter(x=>x.value!==null && x.value!=="" ).length;
+  const setsDone = session.flat.filter(x=>x.value!==null && x.value!=="").length;
   const log = {
     code: session.code,
     name: w.name,
@@ -469,20 +954,15 @@ function saveWorkoutLog(){
 
   state.sport.logsByDay[day] = state.sport.logsByDay[day] || [];
   state.sport.logsByDay[day].push(log);
-  save();
 
-  // quest "sport" auto-check
   state.quests.doneByDay[day]=state.quests.doneByDay[day]||{};
-  if(!state.quests.doneByDay[day]["sport"]){
-    state.quests.doneByDay[day]["sport"]=true;
-    addXp(w.xp);
-  }else{
-    addXp(w.xp); // on donne l'XP quand même
-  }
-  save();
-}
+  if(!state.quests.doneByDay[day]["sport"]) state.quests.doneByDay[day]["sport"]=true;
 
-function screenSport(){
+  save();
+  addXp(w.xp);
+  save();
+  }
+  function screenSport(){
   const day=todayKey();
   const logs = state.sport.logsByDay[day] || [];
   const logsHtml = logs.length ? logs.slice().reverse().map(l=>`
@@ -500,45 +980,64 @@ function screenSport(){
     const w=WORKOUTS[session.code];
     const pct = Math.round((session.i/session.totalSets)*100);
 
-    const title = session.phase==="done" ? "Mission terminée" : (session.phase==="rest" ? "Repos" : "Série");
-    const right = `<div class="pill">${pct}%</div>`;
-
-    let body = "";
     if(session.phase==="done"){
-      body = `
-        <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">XP</div><div style="font-weight:900">+${w.xp}</div></div>
-        <div class="hr"></div>
-        <button class="btn primary" id="saveWorkout">Sauvegarder le log</button>
-        <button class="btn ghost" id="cancelWorkout" style="margin-left:8px">Annuler</button>
-      `;
-    }else if(session.phase==="rest"){
-      body = `
-        <div class="kpi">
-          <div class="value mono">${msToClock(session.restLeftMs)}</div>
-          <div class="label">Repos</div>
+      return `
+        <div class="grid">
+          ${card("Sport — mission terminée", `<div class="pill">${pct}%</div>`, `
+            <div class="row between wrap">
+              <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">TIMER</div><div class="mono" style="font-weight:900" id="workoutTimer">${msToClock(Date.now()-session.startedAt)}</div></div>
+              <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">XP</div><div style="font-weight:900">+${w.xp}</div></div>
+            </div>
+            <div class="hr"></div>
+            <button class="btn primary" id="saveWorkout">Sauvegarder le log</button>
+            <button class="btn ghost" id="cancelWorkout" style="margin-left:8px">Annuler</button>
+          `)}
+          ${card("Logs du jour", "", `<div class="grid">${logsHtml}</div>`)}
         </div>
-        <div class="hr"></div>
-        <button class="btn" id="skipRest">Passer le repos</button>
-      `;
-    }else{
-      const placeholder = set.type==="reps" ? "reps" : "secondes";
-      body = `
-        <div class="mono" style="font-weight:900;letter-spacing:.08em;color:var(--hud2)">${w.name}</div>
-        <div style="margin-top:10px;font-weight:900">${set.exName}</div>
-        <small class="hint">Série ${set.setIndex} / ${w.exercises.find(e=>e.id===set.exId)?.sets || "?"} · cible ${set.target} ${placeholder}</small>
-        <label>Valeur (optionnel)</label>
-        <input inputmode="numeric" id="setValue" placeholder="${set.target}">
-        <div class="row" style="margin-top:10px;gap:10px">
-          <button class="btn primary" id="finishSet">Terminer la série</button>
-          <button class="btn ghost" id="endWorkout">Stop</button>
-        </div>
-        <small class="hint">Si tu ne remplis pas, l’app met automatiquement la valeur MAX cible.</small>
       `;
     }
 
+    if(session.phase==="rest"){
+      return `
+        <div class="grid">
+          ${card("Sport — repos", `<div class="pill">${pct}%</div>`, `
+            <div class="row between wrap">
+              <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">TIMER</div><div class="mono" style="font-weight:900" id="workoutTimer">${msToClock(Date.now()-session.startedAt)}</div></div>
+              <div class="badge"><div class="mono" style="font-weight:900;color:var(--warn)">REST</div><div class="mono" style="font-weight:900">${msToClock(session.restLeftMs)}</div></div>
+            </div>
+            <div class="hr"></div>
+            <button class="btn" id="skipRest">Passer le repos</button>
+          `)}
+          ${card("Logs du jour", "", `<div class="grid">${logsHtml}</div>`)}
+        </div>
+      `;
+    }
+
+    const placeholder = set.type==="reps" ? "reps" : "secondes";
+    const totalForEx = (w.exercises.find(e=>e.id===set.exId)?.sets || "?");
+    const libBtn = `<button class="btn ghost small" data-lib="${set.exId}">Fiche exercice</button>`;
+
     return `
       <div class="grid">
-        ${card("Sport — session active", right, body)}
+        ${card("Sport — série", `<div class="pill">${pct}%</div>`, `
+          <div class="row between wrap">
+            <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">TIMER</div><div class="mono" style="font-weight:900" id="workoutTimer">${msToClock(Date.now()-session.startedAt)}</div></div>
+            <div class="row" style="gap:8px">
+              <div class="pill">${w.name}</div>
+              ${libBtn}
+            </div>
+          </div>
+          <div class="hr"></div>
+          <div style="font-weight:900">${set.exName}</div>
+          <small class="hint">Série ${set.setIndex}/${totalForEx} · cible ${set.target} ${placeholder}</small>
+          <label>Valeur (optionnel)</label>
+          <input inputmode="numeric" id="setValue" placeholder="${set.target}">
+          <div class="row" style="margin-top:10px;gap:10px">
+            <button class="btn primary" id="finishSet">Terminer la série</button>
+            <button class="btn ghost" id="endWorkout">Stop</button>
+          </div>
+          <small class="hint">Si tu ne remplis pas, l’app met automatiquement la valeur MAX cible.</small>
+        `)}
         ${card("Logs du jour", "", `<div class="grid">${logsHtml}</div>`)}
       </div>
     `;
@@ -555,8 +1054,9 @@ function screenSport(){
               <small class="mono">+${w.xp} XP</small>
             </div>
             <small class="hint">${w.exercises.length} exercices · repos ${w.restSec}s</small>
-            <div class="row" style="margin-top:10px;gap:10px;flex-wrap:wrap">
+            <div class="row wrap" style="margin-top:10px;gap:10px">
               <button class="btn primary" data-start="${code}">Démarrer</button>
+              <button class="btn ghost" data-workoutinfo="${code}">Détails</button>
             </div>
           </div>
         `;
@@ -566,9 +1066,13 @@ function screenSport(){
           <div style="font-weight:900">Option</div>
           <small class="mono">AUTO</small>
         </div>
-        <label><input type="checkbox" id="autoFill" ${state.sport.autoFillMax?'checked':''} style="width:18px;height:18px"> Auto-remplir MAX</label>
+        <label style="display:flex;gap:10px;align-items:center;margin:10px 0 0">
+          <input type="checkbox" id="autoFill" ${state.sport.autoFillMax?'checked':''} style="width:18px;height:18px">
+          Auto-remplir MAX
+        </label>
         <small class="hint">Si tu oublies de saisir, l’app met la cible automatiquement.</small>
       </div>
+      <small class="tiny">Clavier OK ✅ : l’écran ne se rafraîchit pas pendant “Série”.</small>
     </div>
   `;
 
@@ -578,8 +1082,181 @@ function screenSport(){
       ${card("Logs du jour", "", `<div class="grid">${logsHtml}</div>`)}
     </div>
   `;
-      }
-  
+}
+
+/* ========= Langues ========= */
+function dailyLesson(){
+  const lessons = [
+    {title:"Présent — SER", text:"SER = être (identité). Ex: Soy ODST. / Eres fuerte. / Es importante."},
+    {title:"Présent — ESTAR", text:"ESTAR = être (état). Ex: Estoy cansado. / Estás listo. / Está aquí."},
+    {title:"Politesse", text:"Por favor, gracias, perdón. Demander: ¿Puedes ayudarme?"},
+    {title:"Questions", text:"¿Qué? ¿Dónde? ¿Cuándo? ¿Por qué? ¿Cómo?"},
+    {title:"Au resto", text:"Quisiera… / La cuenta, por favor. / ¿Cuánto cuesta?"},
+  ];
+  const idx = Math.abs(parseDayKey(todayKey()).getTime()/86400000|0) % lessons.length;
+  return lessons[idx];
+}
+
+function screenLangues(){
+  const day=todayKey();
+  const log = state.lang.logsByDay[day] || { quizDone:false, writingDone:false, quizScore:0, writingText:"" };
+  const deck = state.lang.deck;
+  const start = state.lang.pointer || 0;
+  const qs = [0,1,2].map(i=>deck[(start+i)%deck.length]);
+
+  const completion = (log.quizDone?0.5:0) + (log.writingDone?0.5:0);
+  const lesson = dailyLesson();
+
+  const quizHtml = log.quizDone ? `
+    <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">SCORE</div><div style="font-weight:900">${log.quizScore}/3</div></div>
+  ` : `
+    <div class="grid">
+      ${qs.map((q,i)=>`
+        <div>
+          <div style="font-weight:800">Traduction: "${q.q}"</div>
+          <input id="ans${i}" placeholder="Ta réponse">
+          <small class="hint" id="corr${i}" style="display:none">Correction: <span class="mono">${q.a}</span></small>
+        </div>
+      `).join("")}
+      <div class="row" style="gap:10px">
+        <button class="btn primary" id="quizSubmit">Valider</button>
+        <button class="btn ghost small" id="quizShow">Correction</button>
+      </div>
+    </div>
+  `;
+
+  return `
+    <div class="grid">
+      ${card("Langues — Espagnol (daily)", `<div class="pill">${Math.round(completion*100)}%</div>`, `
+        <div class="box">
+          <div class="mono" style="font-weight:900;color:var(--hud2)">LEÇON DU JOUR — ${lesson.title}</div>
+          <div style="margin-top:10px">${hudSvg("SPANISH / DAILY")}</div>
+          <small class="hint">${lesson.text}</small>
+        </div>
+        <div class="hr"></div>
+        <div class="box">
+          <div class="mono" style="font-weight:900;color:var(--hud2)">MISSION 1 — Micro-quiz (3)</div>
+          <div style="margin-top:10px">${quizHtml}</div>
+        </div>
+        <div class="hr"></div>
+        <div class="box">
+          <div class="mono" style="font-weight:900;color:var(--hud2)">MISSION 2 — Écriture</div>
+          <label>Ta phrase</label>
+          <textarea id="writing" placeholder="Ej: Hoy entreno 20 minutos.">${(log.writingText||"")}</textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary" id="saveWriting">Sauvegarder</button>
+            ${log.writingDone? `<small class="mono ok">OK</small>`:""}
+          </div>
+        </div>
+      `)}
+    </div>
+  `;
+}
+
+/* ========= Rapports + Plus + Bind/Render + fin ========= */
+/* Si tu veux, je te renvoie la suite (Rapports/Plus/Bind/Render + fermeture HTML) en un 3e morceau
+   car sinon ce message devient encore trop gros. */
+  let reportMode = "week";
+function rangeKeys(mode){
+  const now=new Date(); now.setHours(0,0,0,0);
+  if(mode==="week"){
+    const s=startOfWeek(now);
+    const e=new Date(s); e.setDate(e.getDate()+6);
+    return keysInRange(fmtDay(s), fmtDay(e));
+  }
+  if(mode==="month"){
+    const s=new Date(now.getFullYear(), now.getMonth(), 1);
+    const e=new Date(now.getFullYear(), now.getMonth()+1, 0);
+    return keysInRange(fmtDay(s), fmtDay(e));
+  }
+  const s=new Date(now.getFullYear(),0,1);
+  const e=new Date(now.getFullYear(),11,31);
+  return keysInRange(fmtDay(s), fmtDay(e));
+}
+
+function screenRapports(){
+  checkBadges();
+  const keys=rangeKeys(reportMode);
+
+  const xp = weeklyXp(keys);
+  const q = countQuestDone(keys);
+  const weekStart=fmtDay(startOfWeek(new Date()));
+  const qW = (reportMode==="week") ? countWeeklyQuestDone(weekStart) : null;
+
+  const lDays = countLangDays(keys);
+  const s = sportTotals(keys);
+
+  const topExercises = Object.entries(s.perEx)
+    .map(([id,v])=>({id, ...v}))
+    .sort((a,b)=> (b.reps+b.sec) - (a.reps+a.sec))
+    .slice(0,6);
+
+  const exTable = topExercises.length ? topExercises.map(e=>`
+    <div class="box">
+      <div class="row between wrap">
+        <div style="font-weight:900">${e.name}</div>
+        <button class="btn ghost small" data-openlib="${e.id}">Fiche</button>
+      </div>
+      <div class="row wrap" style="gap:8px;margin-top:8px">
+        <span class="tag">Sets ${e.sets}</span>
+        <span class="tag">Reps ${e.reps}</span>
+        <span class="tag">Sec ${e.sec}</span>
+        <span class="tag">PR ${e.pr}</span>
+      </div>
+    </div>
+  `).join('') : `<small class="hint">Pas de données sport sur cette période.</small>`;
+
+  const modeTitle = reportMode==="week" ? "Hebdomadaire" : reportMode==="month" ? "Mensuel" : "Annuel";
+
+  const badgesLocked = BADGE_DEFS.filter(b=>!state.badges.unlocked[b.id]).map(b=>`
+    <div class="box">
+      <div class="row between"><div style="font-weight:900">${b.name}</div><span class="tag"><span class="warn">●</span> à débloquer</span></div>
+      <small class="hint">${b.desc}</small>
+    </div>
+  `).join('') || `<small class="hint">Tous les badges actuels sont débloqués ✅</small>`;
+
+  return `
+    <div class="grid">
+      ${card("Rapports", `<div class="pill">${modeTitle}</div>`, `
+        <div class="row wrap" style="gap:10px">
+          <button class="btn ${reportMode==='week'?'primary':''}" data-rmode="week">Semaine</button>
+          <button class="btn ${reportMode==='month'?'primary':''}" data-rmode="month">Mois</button>
+          <button class="btn ${reportMode==='year'?'primary':''}" data-rmode="year">Année</button>
+        </div>
+        <div class="hr"></div>
+        <div class="row wrap" style="gap:10px">
+          <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">XP</div><div style="font-weight:900">${xp}</div></div>
+          <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">SPORT</div><div style="font-weight:900">${s.sessions} séances</div></div>
+          <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">LANGUES</div><div style="font-weight:900">${lDays} jours OK</div></div>
+          <div class="badge"><div class="mono" style="font-weight:900;color:var(--hud2)">QUÊTES</div><div style="font-weight:900">${q.pct}%</div></div>
+        </div>
+        ${qW ? `<div class="hr"></div><small class="hint">Quêtes hebdo (cette semaine) : ${qW.done}/${qW.total}</small>` : ``}
+      `)}
+
+      ${card("Sport — stats", "", `
+        <div class="row between"><small>Temps total</small><small class="mono">${(s.durationMs/3600000).toFixed(1)} h</small></div>
+        <div class="row between"><small>Sets faits</small><small class="mono">${s.setsDone}</small></div>
+        <div class="hr"></div>
+        <div class="grid">${exTable}</div>
+      `)}
+
+      ${card("Langues — stats", "", `
+        <div class="row between"><small>Jours avec quiz + écriture</small><small class="mono">${lDays}/${keys.length}</small></div>
+        <small class="hint">Objectif: 1 micro-quiz + 1 phrase = journée validée.</small>
+      `)}
+
+      ${card("Quêtes — stats", "", `
+        <div class="row between"><small>Daily complétées</small><small class="mono">${q.done}/${q.total} (${q.pct}%)</small></div>
+        <small class="hint">Les quêtes hebdo sont visibles dans l’onglet Quêtes.</small>
+      `)}
+
+      ${card("Badges — à débloquer", "", `<div class="grid">${badgesLocked}</div>`)}
+    </div>
+  `;
+}
+
+/* ========= Plus ========= */
+let libQuery = "";
 function screenPlus(){
   const fin = state.finance.bars.map(b=>`
     <div class="box">
@@ -595,32 +1272,61 @@ function screenPlus(){
           <input inputmode="numeric" data-fin-tgt="${b.id}" value="${b.target}">
         </div>
       </div>
-      <small class="hint">Pour une dette : mets cible = 0 (affiche “restant”).</small>
+      <small class="hint">Pour une dette : mets cible = 0.</small>
     </div>
   `).join('');
 
+  const lib = EXLIB
+    .filter(ex=>{
+      const q=norm(libQuery);
+      if(!q) return true;
+      return norm(ex.name).includes(q) || ex.muscles.some(m=>norm(m).includes(q)) || ex.equip.some(e=>norm(e).includes(q));
+    })
+    .map(libCard).join('') || `<small class="hint">Aucun résultat.</small>`;
+
+  const unlocked = Object.keys(state.badges.unlocked||{});
+  const badges = unlocked.length ? unlocked.map(id=>{
+    const def=BADGE_DEFS.find(b=>b.id===id);
+    return `<div class="box"><div class="row between"><div style="font-weight:900">${def?def.name:id}</div><span class="tag"><span class="ok">●</span> débloqué</span></div><small class="hint">${def?def.desc:""}</small></div>`;
+  }).join('') : `<small class="hint">Aucun badge pour le moment.</small>`;
+
   return `
     <div class="grid">
+      ${card("Bibliothèque — exercices", "", `
+        <label>Recherche</label>
+        <input id="libSearch" placeholder="ex: dos, squat, pec..." value="${libQuery}">
+        <div class="hr"></div>
+        <div class="grid">${lib}</div>
+      `)}
       ${card("Finances — éditer barres", "", `<div class="grid">${fin}</div>`)}
+      ${card("Badges", "", `<div class="grid">${badges}</div>`)}
       ${card("Données — export / import / reset", "", `
-        <div class="row" style="gap:10px;flex-wrap:wrap">
+        <div class="row wrap" style="gap:10px">
           <button class="btn primary" id="doExport">Exporter JSON</button>
           <button class="btn" id="doImport">Importer JSON</button>
           <button class="btn danger" id="doReset">RESET</button>
         </div>
         <label>JSON</label>
         <textarea id="jsonArea" placeholder="Exporter → copie. Importer → colle ici."></textarea>
-        <small class="hint">Tout est offline (localStorage). Export/import = sauvegarde manuelle.</small>
       `)}
     </div>
   `;
 }
 
+/* ========= Bind + Render ========= */
 function bind(){
+  const day=todayKey();
+
+  document.querySelectorAll('[data-rmode]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      reportMode=b.dataset.rmode;
+      render();
+    });
+  });
+
   document.querySelectorAll('[data-q]').forEach(cb=>{
     cb.addEventListener('change', ()=>{
       const qid = cb.dataset.q;
-      const day=todayKey();
       state.quests.doneByDay[day]=state.quests.doneByDay[day]||{};
       const was = !!state.quests.doneByDay[day][qid];
 
@@ -636,54 +1342,52 @@ function bind(){
     });
   });
 
-  document.querySelectorAll('[data-fin-cur]').forEach(inp=>{
-    inp.addEventListener('input', ()=>{
-      const id=inp.dataset.finCur;
-      const b=state.finance.bars.find(x=>x.id===id);
-      if(b) b.current = Number(inp.value||0);
-      save();
-    });
-  });
-  document.querySelectorAll('[data-fin-tgt]').forEach(inp=>{
-    inp.addEventListener('input', ()=>{
-      const id=inp.dataset.finTgt;
-      const b=state.finance.bars.find(x=>x.id===id);
-      if(b) b.target = Number(inp.value||0);
-      save();
-    });
+  const qAll=$("#qAllDaily");
+  if(qAll) qAll.addEventListener('click', ()=>{
+    state.quests.doneByDay[day]=state.quests.doneByDay[day]||{};
+    for(const q of state.quests.items.filter(x=>x.freq!=="weekly")){
+      if(!state.quests.doneByDay[day][q.id]){
+        state.quests.doneByDay[day][q.id]=true;
+        addXp(q.xp);
+      }
+    }
+    save();
+    render();
   });
 
-  const doExport=$("#doExport");
-  if(doExport) doExport.addEventListener('click', ()=>{
-    $("#jsonArea").value = JSON.stringify(state, null, 2);
+  const qClear=$("#qClearToday");
+  if(qClear) qClear.addEventListener('click', ()=>{
+    state.quests.doneByDay[day] = {};
+    save();
+    render();
   });
-  const doImport=$("#doImport");
-  if(doImport) doImport.addEventListener('click', ()=>{
-    try{
-      const parsed = JSON.parse($("#jsonArea").value);
-      state = deepMerge(DEFAULTS, parsed);
-      save();
-      render();
-      alert("Import OK");
-    }catch{
-      alert("JSON invalide");
-    }
-  });
-  const doReset=$("#doReset");
-  if(doReset) doReset.addEventListener('click', ()=>{
-    if(confirm("RESET complet ?")){
-      state = JSON.parse(JSON.stringify(DEFAULTS));
-      save();
-      render();
-    }
-  });
-  // --- SPORT binds ---
+
   document.querySelectorAll('[data-start]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const code=btn.dataset.start;
       session = makeSession(code);
       startTimer();
+      startWorkoutClock();
       render();
+    });
+  });
+
+  document.querySelectorAll('[data-workoutinfo]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const code=btn.dataset.workoutinfo;
+      const w=WORKOUTS[code];
+      const body = `
+        ${hudSvg(w.name.toUpperCase())}
+        <div class="box">
+          <div class="mono" style="font-weight:900;color:var(--hud2)">Contenu</div>
+          <ul class="hint" style="margin:10px 0 0; padding-left:18px">
+            ${w.exercises.map(e=>`<li>${e.name} — ${e.sets} séries — cible ${e.target} ${e.type}</li>`).join('')}
+          </ul>
+          <div class="hr"></div>
+          <small class="hint">Repos: ${w.restSec}s · XP: +${w.xp}</small>
+        </div>
+      `;
+      openModal("SÉANCE", w.name, body);
     });
   });
 
@@ -698,11 +1402,10 @@ function bind(){
     const set=currentSet();
     const v = $("#setValue") ? $("#setValue").value : "";
     if(set){
-      set.value = (v===""? null : Number(v));
+      set.value = (v==="" ? null : Number(v));
     }
     finishSet();
     save();
-    render();
   });
 
   const skip=$("#skipRest");
@@ -716,7 +1419,7 @@ function bind(){
   const end=$("#endWorkout");
   if(end) end.addEventListener('click', ()=>{
     if(confirm("Stopper la séance ?")){
-      stopTimer();
+      stopTimer(); stopWorkoutClock();
       session=null;
       render();
     }
@@ -725,7 +1428,7 @@ function bind(){
   const saveW=$("#saveWorkout");
   if(saveW) saveW.addEventListener('click', ()=>{
     saveWorkoutLog();
-    stopTimer();
+    stopTimer(); stopWorkoutClock();
     session=null;
     render();
     alert("Workout log sauvegardé + XP ajouté.");
@@ -733,9 +1436,119 @@ function bind(){
 
   const cancelW=$("#cancelWorkout");
   if(cancelW) cancelW.addEventListener('click', ()=>{
-    stopTimer();
+    stopTimer(); stopWorkoutClock();
     session=null;
     render();
+  });
+
+  document.querySelectorAll('[data-lib]').forEach(btn=>{
+    btn.addEventListener('click', ()=>openExerciseModal(btn.dataset.lib));
+  });
+  document.querySelectorAll('[data-openlib]').forEach(btn=>{
+    btn.addEventListener('click', ()=>openExerciseModal(btn.dataset.openlib));
+  });
+
+  const showBtn=$("#quizShow");
+  if(showBtn) showBtn.addEventListener('click', ()=>{
+    for(let i=0;i<3;i++){
+      const el=$("#corr"+i);
+      if(el) el.style.display="block";
+    }
+  });
+
+  const submitQuiz=$("#quizSubmit");
+  if(submitQuiz) submitQuiz.addEventListener('click', ()=>{
+    const deck=state.lang.deck;
+    const start=state.lang.pointer||0;
+    const qs=[0,1,2].map(i=>deck[(start+i)%deck.length]);
+
+    let score=0;
+    for(let i=0;i<3;i++){
+      const a = ($("#ans"+i)?.value) || "";
+      if(norm(a)===norm(qs[i].a)) score++;
+    }
+
+    state.lang.logsByDay[day]=state.lang.logsByDay[day]||{};
+    state.lang.logsByDay[day].quizDone=true;
+    state.lang.logsByDay[day].quizScore=score;
+    state.lang.pointer=(start+3)%deck.length;
+
+    state.quests.doneByDay[day]=state.quests.doneByDay[day]||{};
+    if(!state.quests.doneByDay[day]["quiz"]) state.quests.doneByDay[day]["quiz"]=true;
+
+    save();
+    addXp(80);
+    render();
+  });
+
+  const saveWriting=$("#saveWriting");
+  if(saveWriting) saveWriting.addEventListener('click', ()=>{
+    const t = ($("#writing")?.value || "").trim();
+    state.lang.logsByDay[day]=state.lang.logsByDay[day]||{};
+    state.lang.logsByDay[day].writingDone=true;
+    state.lang.logsByDay[day].writingText=t;
+
+    state.quests.doneByDay[day]=state.quests.doneByDay[day]||{};
+    if(!state.quests.doneByDay[day]["write"]) state.quests.doneByDay[day]["write"]=true;
+
+    save();
+    addXp(80);
+    render();
+  });
+
+  const libS=$("#libSearch");
+  if(libS) libS.addEventListener('input', ()=>{
+    libQuery = libS.value || "";
+    render();
+  });
+
+  document.querySelectorAll('[data-fin-cur]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const id=inp.dataset.finCur;
+      const b=state.finance.bars.find(x=>x.id===id);
+      if(b) b.current = Number(inp.value||0);
+      save();
+      checkBadges();
+    });
+  });
+  document.querySelectorAll('[data-fin-tgt]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const id=inp.dataset.finTgt;
+      const b=state.finance.bars.find(x=>x.id===id);
+      if(b) b.target = Number(inp.value||0);
+      save();
+      checkBadges();
+    });
+  });
+
+  const doExport=$("#doExport");
+  if(doExport) doExport.addEventListener('click', ()=>{
+    $("#jsonArea").value = JSON.stringify(state, null, 2);
+  });
+  const doImport=$("#doImport");
+  if(doImport) doImport.addEventListener('click', ()=>{
+    try{
+      const parsed = JSON.parse($("#jsonArea").value);
+      state = deepMerge(DEFAULTS, parsed);
+      save();
+      checkBadges();
+      render();
+      alert("Import OK");
+    }catch{
+      alert("JSON invalide");
+    }
+  });
+  const doReset=$("#doReset");
+  if(doReset) doReset.addEventListener('click', ()=>{
+    if(confirm("RESET complet ?")){
+      state = JSON.parse(JSON.stringify(DEFAULTS));
+      save();
+      stopTimer(); stopWorkoutClock();
+      session=null;
+      libQuery="";
+      reportMode="week";
+      render();
+    }
   });
 }
 
@@ -744,11 +1557,15 @@ function render(){
   if(tab==='hud') app.innerHTML = screenHud();
   if(tab==='q') app.innerHTML = screenQuests();
   if(tab==='s') app.innerHTML = screenSport();
+  if(tab==='l') app.innerHTML = screenLangues();
+  if(tab==='r') app.innerHTML = screenRapports();
   if(tab==='p') app.innerHTML = screenPlus();
   bind();
+  if(session) startWorkoutClock(); else stopWorkoutClock();
 }
 
 renderTabs();
+checkBadges();
 render();
 </script>
 </body>
